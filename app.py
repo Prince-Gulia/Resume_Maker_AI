@@ -115,7 +115,7 @@ def get_llm_model(api_key: str):
         return None
     try:
         return ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash",
             google_api_key=api_key.strip(),
             temperature=0.2
         )
