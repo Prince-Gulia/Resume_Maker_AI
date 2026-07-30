@@ -58,14 +58,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.sidebar.title("🔑 API Settings")
-st.sidebar.info("Configure your API credentials below. Defaults are loaded automatically if provided.")
+st.sidebar.info("Configure your API credentials below. Defaults are loaded automatically if provided in your environment.")
 
-DEFAULT_GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6Jkv5p04YWXvhp5SzkVFgbKK8XxbCTu77udtWfTUYz-8Q")
-DEFAULT_GROQ_KEY = os.environ.get("GROQ_API_KEY", "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")
-DEFAULT_TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "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")
+DEFAULT_GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
+DEFAULT_TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "")
 
-gemini_api_key = st.sidebar.text_input("Gemini API Key", value=DEFAULT_GEMINI_KEY, type="password")
-tavily_api_key = st.sidebar.text_input("Tavily API Key", value=DEFAULT_TAVILY_KEY, type="password")
+gemini_api_key = st.sidebar.text_input("Gemini API Key", value=DEFAULT_GEMINI_KEY, type="password", placeholder="AIzaSy...")
+tavily_api_key = st.sidebar.text_input("Tavily API Key", value=DEFAULT_TAVILY_KEY, type="password", placeholder="tvly-...")
 tesseract_path = st.sidebar.text_input("Tesseract OCR Path (Optional)", value="", placeholder="e.g. C:\\Program Files\\Tesseract-OCR\\tesseract.exe")
 
 if tesseract_path.strip():
@@ -107,12 +106,12 @@ def clean_html_code(raw_code: str) -> str:
 
 def get_llm_model(api_key: str):
     """Initializes Google Gemini model safely."""
-    if not api_key:
-        st.error("Please provide a valid Gemini API Key in the sidebar.")
+    if not api_key or not api_key.startswith("AIzaSy"):
+        st.error("⚠️ Invalid or missing Gemini API Key. Please enter a valid key starting with 'AIzaSy' from Google AI Studio (https://aistudio.google.com/).")
         return None
     try:
         return ChatGoogleGenerativeAI(
-            model="gemini-3.5-flash",
+            model="gemini-1.5-flash",
             google_api_key=api_key,
             temperature=0.2
         )
