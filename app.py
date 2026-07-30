@@ -13,8 +13,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from tavily import TavilyClient
 
-# Load environment variables from local .env file
-load_dotenv()
+load_dotenv(override=True)
 warnings.filterwarnings("ignore")
 
 st.set_page_config(
@@ -24,7 +23,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for dark-mode aesthetic and crisp UI
 st.markdown("""
 <style>
     .main-header {
@@ -63,11 +61,10 @@ st.markdown("""
 st.sidebar.title("🔑 API Settings")
 st.sidebar.info("Configure your API credentials below. Defaults are loaded automatically if provided in your environment.")
 
-# Retrieve default keys safely from Streamlit secrets or environment variables
 DEFAULT_GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
 DEFAULT_TAVILY_KEY = st.secrets.get("TAVILY_API_KEY", os.environ.get("TAVILY_API_KEY", ""))
 
-gemini_api_key = st.sidebar.text_input("Gemini API Key", value=DEFAULT_GEMINI_KEY, type="password", placeholder="AIzaSy...")
+gemini_api_key = st.sidebar.text_input("Gemini API Key", value=DEFAULT_GEMINI_KEY, type="password", placeholder="Paste your API key here...")
 tavily_api_key = st.sidebar.text_input("Tavily API Key", value=DEFAULT_TAVILY_KEY, type="password", placeholder="tvly-...")
 tesseract_path = st.sidebar.text_input("Tesseract OCR Path (Optional)", value="", placeholder="e.g. C:\\Program Files\\Tesseract-OCR\\tesseract.exe")
 
@@ -109,13 +106,13 @@ def clean_html_code(raw_code: str) -> str:
     return code.strip()
 
 def get_llm_model(api_key: str):
-    """Initializes Google Gemini model safely."""
+    """Initializes Google Gemini model using gemini-3.5-flash with any provided key."""
     if not api_key or not api_key.strip():
-        st.error("⚠️ Missing Gemini API Key. Please enter a valid key from Google AI Studio (https://aistudio.google.com/).")
+        st.error("⚠️ Gemini API Key is missing. Please enter your API key in the sidebar or set it in your .env file.")
         return None
     try:
         return ChatGoogleGenerativeAI(
-            model="gemini-3.5-flash",
+            model="gemini-3.5-flash-lite",
             google_api_key=api_key.strip(),
             temperature=0.2
         )
@@ -125,10 +122,10 @@ def get_llm_model(api_key: str):
 
 def search_tavily_jobs(query: str, api_key: str):
     """Executes search via Tavily Client."""
-    if not api_key:
+    if not api_key or not api_key.strip():
         return "Tavily API key missing."
     try:
-        client = TavilyClient(api_key=api_key)
+        client = TavilyClient(api_key=api_key.strip())
         response = client.search(query=query, search_depth="advanced", max_results=10)
         return response
     except Exception as e:
@@ -231,7 +228,7 @@ Objective: To engineer scalable REST APIs, real-time architectures, and producti
     if st.button("🚀 Generate Resume"):
         llm = get_llm_model(gemini_api_key)
         if llm:
-            with st.spinner("Generating ATS HTML Resume..."):
+            with st.spinner("Generating ATS HTML Resume with Gemini 3.5 Flash..."):
                 html_resume = generate_resume_html(llm, user_profile_query)
                 if html_resume:
                     st.success("Resume Generated Successfully!")
