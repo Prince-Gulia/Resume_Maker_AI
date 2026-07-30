@@ -6,12 +6,15 @@ import pandas as pd
 import numpy as np
 from PIL import Image
 import pytesseract as pyt
+from dotenv import load_dotenv
 
-# LangChain Imports
+# LangChain & Tavily Imports
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from tavily import TavilyClient
 
+# Load environment variables from a local .env file if present
+load_dotenv()
 warnings.filterwarnings("ignore")
 
 st.set_page_config(
@@ -60,8 +63,9 @@ st.markdown("""
 st.sidebar.title("🔑 API Settings")
 st.sidebar.info("Configure your API credentials below. Defaults are loaded automatically if provided in your environment.")
 
-DEFAULT_GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
-DEFAULT_TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "")
+# Retrieve default keys safely from Streamlit secrets or environment variables
+DEFAULT_GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+DEFAULT_TAVILY_KEY = st.secrets.get("TAVILY_API_KEY", os.environ.get("TAVILY_API_KEY", ""))
 
 gemini_api_key = st.sidebar.text_input("Gemini API Key", value=DEFAULT_GEMINI_KEY, type="password", placeholder="AIzaSy...")
 tavily_api_key = st.sidebar.text_input("Tavily API Key", value=DEFAULT_TAVILY_KEY, type="password", placeholder="tvly-...")
@@ -111,7 +115,7 @@ def get_llm_model(api_key: str):
         return None
     try:
         return ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-3.5-flash",
             google_api_key=api_key,
             temperature=0.2
         )
@@ -217,7 +221,7 @@ Contact: princegulia170306@gmail.com, 8527875112.
 Links: github.com/Prince-Gulia-, linkedin.com/in/princegulia, prince-portfolio-xi.vercel.app.
 Core Skills: JavaScript, C++, SQL, Python, Node.js, Express.js, PostgreSQL, pgvector, Supabase, MySQL, Redis, BullMQ, Socket.io, JWT Authentication, Gemini API, RAG Pipelines, Linux, Git.
 Key Projects:
-1. DocuMind (AI Document Assistant): Architected a RAG pipeline using Gemini API for vector embeddings and pgvector for similarity search. Engineered an asynchronous PDF processing queue using BullMQ and ioredis. Improved retrieval quality with 500-word boundary overlap chunking.
+1. DocuMind (AI Document Assistant): Architected a RAG pipeline utilizing Gemini API for vector embeddings and pgvector for high-performance semantic search. Engineered an asynchronous background queue using BullMQ and ioredis for PDF processing. Optimized search accuracy with a 500-word text chunking algorithm using boundary overlaps.
 2. File Processing API: Built an async file ingestion API for multi-format uploads via Multer, BullMQ, and Upstash Redis. Integrated Sharp for image transformation and Cloudinary for CDN delivery.
 3. RealChat: Built a real-time chat backend with Socket.io and JWT authentication. Engineered PostgreSQL schema with B-tree indexing for fast message retrieval.
 Objective: To engineer scalable REST APIs, real-time architectures, and production-ready AI-integrated systems."""
