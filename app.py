@@ -159,8 +159,6 @@ def get_jobs(agent,
 # code = get_jobs(agent)
 # DISPLAY.HTML(code)
 
-
-=======
 # ==========LOAD MODULES========================
 import os
 import time
