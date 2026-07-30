@@ -12,6 +12,17 @@ import pandas as pd
 import numpy as np
 import warnings
 
+# To Show web-app: complete page layout
+st.set_page_config(layout="wide")
+
+# To Give Title
+st.title("AI RESUME GENERATOR")
+
+st.write("""This app helps user to build customized Professional
+Resume with Latest Job apply links""")
+
+st.image("bg.png")
+
 # API KEYS
 GEMINI_API_KEY = "AQ.Ab8RN6Jkv5p04YWXvhp5SzkVFgbKK8XxbCTu77udtWfTUYz-8Q"
 GROQ_API_KEY = "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"
@@ -23,8 +34,8 @@ model = ChatGoogleGenerativeAI(
     google_api_key = GEMINI_API_KEY
 )
 
-response = model.invoke("Hello Brother")
-response.content[-1]['text']
+# response = model.invoke("Hello Brother")
+# response.content[-1]['text']
 
 # Tool for getting latest news related Job
 def search_latest_news_jobs(query):
@@ -41,7 +52,7 @@ agent = create_agent(
     model=model,
     tools = [search_latest_news_jobs]
 )
-agent
+# agent
 
 # A tool for handling all the agents, main agent that gives the detailed orders and instructions
 from IPython.display import display, HTML
@@ -102,19 +113,19 @@ Objective: To engineer scalable REST APIs, real-time architectures, and producti
 """
 
 # 6. Execute and render
-html_resume = main_agent(agent, query_string)
-display(HTML(html_resume))
+# html_resume = main_agent(agent, query_string)
+# display(HTML(html_resume))
 
 # Calling the function
-from IPython.display import display, HTML
+# from IPython.display import display, HTML
 
 # 3. Call your function
 query_string = "Agent Persona: Prince Gulia. Profile: Backend Developer and final-year BCA student (2024-2027, 9.52 CGPA) at Guru Gobind Singh Indraprastha University, New Delhi. Contact: princegulial70306@gmail.com, 8527875112, github.com/Prince-Gulia-. Core Skills: JavaScript, C++, SQL, Python, PHP, Node.js, Express, PostgreSQL, pgvector, Redis, BullMQ, Socket.io, Gemini API, RAG Pipelines. Key Projects: DocuMind (AI Document Assistant with Gemini API and async processing), File Processing API (multi-format background processing), RealChat (real-time WebSockets), FairPrice (price intelligence platform), DataLens (dataset analyzer), and a full-stack Study Tracker. Traits & Philosophy: Highly focused on backend efficiency, system scalability, and digging into complex, hidden programming concepts. Values hard work, continuous learning, and peace; actively avoids passive consumption and scrolling. Environment Preferences: Works best in dark-themed coding environments (specifically shades like 'Betel Leaf') while listening to Punjabi, Haryanvi, Electronic, and Phonk music. Objective: To engineer scalable REST APIs, real-time architectures, and production-ready AI-integrated systems."
 
-code = main_agent(agent, query_string)
+# code = main_agent(agent, query_string)
 
 # 4. Wrap the HTML object inside the display() function to render it
-display(HTML(code))
+# display(HTML(code))
 
 # Tool for getting jobs
 def get_jobs(agent, Location="New Delhi, Delhi", Profile="Backend Developer, Node.JS"):
@@ -153,5 +164,5 @@ def get_jobs(agent, Location="New Delhi, Delhi", Profile="Backend Developer, Nod
 
     return code
 
-code = get_jobs(agent)
-display(HTML(code))
+# code = get_jobs(agent)
+# display(HTML(code)) 
