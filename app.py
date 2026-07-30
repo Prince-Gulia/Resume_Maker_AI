@@ -1,168 +1,293 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_groq import ChatGroq
-import langchain
-from langchain.agents import create_agent
-from tavily import TavilyClient
-import pytesseract as pyt
 import os
 import time
-from PIL import Image
-import pandas as pd
-import numpy as np
 import warnings
 import streamlit as st
+import pandas as pd
+import numpy as np
+from PIL import Image
+import pytesseract as pyt
 
-# To Show web-app: complete page layout
-st.set_page_config(layout="wide")
+# LangChain Imports
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage, SystemMessage
+from tavily import TavilyClient
 
-# To Give Title
-st.title("AI RESUME GENERATOR")
+warnings.filterwarnings("ignore")
 
-st.write("""This app helps user to build customized Professional
-Resume with Latest Job apply links""")
-
-st.image("bg.png")
-
-# API KEYS
-GEMINI_API_KEY = "AQ.Ab8RN6Jkv5p04YWXvhp5SzkVFgbKK8XxbCTu77udtWfTUYz-8Q"
-GROQ_API_KEY = "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"
-TAVILY_API_KEY="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"
-
-# Model Creation
-model = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash-lite",
-    google_api_key = GEMINI_API_KEY
+st.set_page_config(
+    page_title="AI Resume Generator & Job Agent",
+    page_icon="📄",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# response = model.invoke("Hello Brother")
-# response.content[-1]['text']
+# Custom CSS for dark-mode aesthetic and crisp UI
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #4A90E2;
+        margin-bottom: 0.2rem;
+    }
+    .sub-header {
+        font-size: 1.1rem;
+        color: #A0AEC0;
+        margin-bottom: 1.5rem;
+    }
+    .stButton>button {
+        background-color: #2B6CB0;
+        color: white;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        padding: 0.5rem 1rem;
+    }
+    .stButton>button:hover {
+        background-color: #3182CE;
+        color: white;
+    }
+    .card-box {
+        background-color: #1A202C;
+        border: 1px solid #2D3748;
+        border-radius: 8px;
+        padding: 1.2rem;
+        margin-bottom: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Tool for getting latest news related Job
-def search_latest_news_jobs(query):
-  """This function helps to fetch the latest news and jobs related to the query using tavily"""
+st.sidebar.title("🔑 API Settings")
+st.sidebar.info("Configure your API credentials below. Defaults are loaded automatically if provided.")
 
-  client = TavilyClient(
-      api_key = TAVILY_API_KEY
-  )
-  response = client.search(query)
-  return response
+DEFAULT_GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6Jkv5p04YWXvhp5SzkVFgbKK8XxbCTu77udtWfTUYz-8Q")
+DEFAULT_GROQ_KEY = os.environ.get("GROQ_API_KEY", "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")
+DEFAULT_TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "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")
 
-# Creating a model
-agent = create_agent(
-    model=model,
-    tools = [search_latest_news_jobs]
-)
-# agent
+gemini_api_key = st.sidebar.text_input("Gemini API Key", value=DEFAULT_GEMINI_KEY, type="password")
+tavily_api_key = st.sidebar.text_input("Tavily API Key", value=DEFAULT_TAVILY_KEY, type="password")
+tesseract_path = st.sidebar.text_input("Tesseract OCR Path (Optional)", value="", placeholder="e.g. C:\\Program Files\\Tesseract-OCR\\tesseract.exe")
 
-# A tool for handling all the agents, main agent that gives the detailed orders and instructions
-from IPython.display import display, HTML
+if tesseract_path.strip():
+    pyt.pytesseract.tesseract_cmd = tesseract_path.strip()
 
-def main_agent(agent, query):
-    """This is the main agent that orchestrates the resume generation."""
+def extract_text_from_llm_response(response) -> str:
+    """Safely extracts text string from various LangChain message response formats."""
+    if isinstance(response, str):
+        return response
+    if hasattr(response, 'content'):
+        content = response.content
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                elif isinstance(item, dict) and 'text' in item:
+                    parts.append(item['text'])
+            return "\n".join(parts)
+    if isinstance(response, dict):
+        if 'output' in response:
+            return str(response['output'])
+        if 'messages' in response and len(response['messages']) > 0:
+            return extract_text_from_llm_response(response['messages'][-1])
+    return str(response)
 
-    # 1. FIXED PROMPT: Added explicit CSS color rendering rules
-    prompt = """You are an expert AI prompt engineer. Your task is to write a highly detailed system prompt for an advanced Resume Generator Agent.
+def clean_html_code(raw_code: str) -> str:
+    """Strips markdown block markers from generated HTML."""
+    code = raw_code.strip()
+    if code.startswith("```html"):
+        code = code[7:]
+    elif code.startswith("```"):
+        code = code[3:]
+    if code.endswith("```"):
+        code = code[:-3]
+    return code.strip()
 
-    The Resume Generator Agent must create professional, ATS-optimized resumes in pure HTML/CSS.
-    Crucial rules the generated prompt MUST enforce on the agent:
-    1. ATS-Friendly Structure: Use standard, semantic HTML (<h1> for Name, <h2> for section headers, <ul>/<li> for bullet points). Avoid complex CSS grids or flexbox layouts for text-heavy sections that confuse ATS parsers.
-    2. Header Layout: The Name MUST be on its own line at the very top (<h1>), followed immediately by the Job Title (<h2>) on the next line. Include all contact info and links clearly below it.
-    3. Zero Data Loss: The agent MUST NOT summarize, shorten, or remove technical details, metrics, keywords, or bullet points provided by the user.
-    4. Single Page Constraint: Use compact CSS (adjusted padding, margins, line-height, and professional fonts) to ensure the resume fits cleanly on one page. Prevent any blank second pages.
-    5. Output Format: Return ONLY raw HTML code. Do not wrap the output in markdown blocks (e.g., no ```html).
-    6. Visibility & Styling (CRITICAL): The HTML MUST include an embedded <style> block that explicitly sets `body { background-color: #ffffff !important; color: #111111 !important; }`. All headings, links, and text must be explicitly colored black or dark gray to ensure high contrast and perfect readability, even when rendered in dark-mode IDEs. Do not use dark backgrounds.
+def get_llm_model(api_key: str):
+    """Initializes Google Gemini model safely."""
+    if not api_key:
+        st.error("Please provide a valid Gemini API Key in the sidebar.")
+        return None
+    try:
+        return ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            google_api_key=api_key,
+            temperature=0.2
+        )
+    except Exception as e:
+        st.error(f"Error initializing Gemini Model: {str(e)}")
+        return None
+
+def search_tavily_jobs(query: str, api_key: str):
+    """Executes search via Tavily Client."""
+    if not api_key:
+        return "Tavily API key missing."
+    try:
+        client = TavilyClient(api_key=api_key)
+        response = client.search(query=query, search_depth="advanced", max_results=10)
+        return response
+    except Exception as e:
+        return f"Error executing Tavily search: {str(e)}"
+
+def generate_resume_html(llm, user_query: str) -> str:
+    """Orchestrates system prompt generation and raw HTML resume creation."""
+    system_prompt = """You are an expert ATS Prompt Engineer and Resume Builder.
+    Your task is to generate a professional, ATS-optimized, single-page resume in raw semantic HTML/CSS based STRICTLY on the user's data.
+
+    STRICT RULES:
+    1. Structure: Standard semantic HTML (<h1> for Name, <h2> for Section Titles, <ul>/<li> for achievements).
+    2. Header: Name MUST be on an <h1> tag at the very top, followed by Job Title in <h2>, then contact details & links below.
+    3. Zero Data Loss: Do NOT summarize, truncate, or drop technical bullet points, skills, or links.
+    4. Formatting & Style: Include an embedded <style> block forcing `body { background-color: #ffffff !important; color: #111111 !important; font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; line-height: 1.4; }`. 
+    5. Single-Page Constraint: Keep CSS paddings/margins tight so content fits on one A4 page without blank trailing space.
+    6. Output: Return ONLY raw HTML code. Do NOT wrap the code in markdown (no ```html).
     """
 
-    # Generate the detailed prompt based on the new ATS-focused rules
-    response = agent.invoke({"messages" : [{"role" : "user", "content" : prompt}]})
-    detailed_prompt = response['messages'][-1].content[-1]['text']
+    user_instructions = f"""
+    Generate an ATS-optimized HTML resume for the following user details:
 
-    with open('prompt.txt', 'w') as f:
-        f.write(detailed_prompt)
-
-    # 2. FIXED USER INSTRUCTIONS: Demand strict adherence to the data
-    user_details = f"""
-    Below is the user's profile and data.
-    Generate a highly professional, ATS-optimized HTML resume based STRICTLY on this data. Do not omit any technical bullet points, skills, or links.
-
-    USER DETAILS: {query}
+    USER DETAILS:
+    {user_query}
     """
 
-    final_prompt = detailed_prompt + "\n\n" + user_details
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_instructions)
+    ]
 
-    # 3. CODE GENERATION
-    response = agent.invoke({'messages': [{'role':'user', 'content':final_prompt}]})
-    code = response['messages'][-1].content[-1]['text']
+    try:
+        response = llm.invoke(messages)
+        raw_code = extract_text_from_llm_response(response)
+        return clean_html_code(raw_code)
+    except Exception as e:
+        st.error(f"Failed to generate resume: {str(e)}")
+        return ""
 
-    # 4. Cleanup: Strip markdown wrappers just in case the LLM disobeys the format rule
-    code = code.replace("```html", "").replace("```", "").strip()
+def generate_job_cards(llm, location: str, profile: str, tavily_key: str) -> str:
+    """Searches live job listings and formats them into an HTML cards layout."""
+    search_query = f"{profile} jobs in {location} site:linkedin.com OR site:indeed.com"
+    search_results = search_tavily_jobs(search_query, tavily_key)
 
-    return code
+    prompt = f"""You are a Job Search Assistant.
+    Format the following live search results into a clean, modern HTML grid of Job Cards.
 
-# 5. The highly-detailed query string
-query_string = """
-Agent Persona: Prince Gulia. Profile: Backend Developer and final-year BCA student (2024-2027, 9.52 CGPA) at Guru Gobind Singh Indraprastha University, New Delhi.
-Contact: princegulial70306@gmail.com, 8527875112.
-Links: [github.com/Prince-Gulia-](https://github.com/Prince-Gulia-), [linkedin.com/in/princegulia](https://linkedin.com/in/princegulia), prince-portfolio-xi.vercel.app.
-Core Skills: JavaScript, C++, SQL, Python, Node.js, Express.js, PostgreSQL, pgvector, Supabase, MySQL, SQLite, Redis, BullMQ, Socket.io, JWT Authentication, Gemini API, RAG Pipelines, Multer, Cloudinary, Sharp, Git, Linux.
+    Target Profile: {profile}
+    Target Location: {location}
+    Search Data: {search_results}
+
+    CRITICAL RULES:
+    1. Extract up to 8-10 real, relevant job postings from the search data.
+    2. Show: Job Title, Company Name, Location, Estimated Salary (or Market Average), and a Direct Apply button (`<a href="..." target="_blank" class="apply-btn">Apply Now</a>`).
+    3. CSS Requirements: Embedded `<style>` block with modern responsive card layout, subtle dark/light border styling, and styled blue action buttons.
+    4. Output ONLY raw HTML. Do not wrap in markdown blocks.
+    """
+
+    messages = [HumanMessage(content=prompt)]
+
+    try:
+        response = llm.invoke(messages)
+        raw_code = extract_text_from_llm_response(response)
+        return clean_html_code(raw_code)
+    except Exception as e:
+        st.error(f"Failed to fetch job cards: {str(e)}")
+        return ""
+
+st.markdown('<div class="main-header">⚡ AI Resume Generator & Live Job Agent</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Build ATS-Friendly HTML Resumes & Search Real-Time Job Openings using Gemini & Tavily AI</div>', unsafe_allow_html=True)
+
+# Image / Banner Fallback
+if os.path.exists("bg.png"):
+    st.image("bg.png", use_container_width=True)
+else:
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-radius: 10px; padding: 20px; text-align: center; color: #E2E8F0; margin-bottom: 20px; border: 1px solid #334155;">
+        <h4>🚀 Automated Career Assistant</h4>
+        <p style="margin:0; font-size: 0.9rem; color: #94A3B8;">Generate semantic resumes, parse existing documents, and discover targeted postings.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+tab1, tab2, tab3 = st.tabs(["📄 Resume Generator", "💼 Job Finder Agent", "📷 OCR Text Scanner"])
+
+with tab1:
+    st.subheader("Generate ATS-Optimized HTML Resume")
+    
+    default_query = """Agent Persona: Prince Gulia. Profile: Backend Developer and final-year BCA student (2024-2027, 9.52 CGPA) at Guru Gobind Singh Indraprastha University, New Delhi.
+Contact: princegulia170306@gmail.com, 8527875112.
+Links: github.com/Prince-Gulia-, linkedin.com/in/princegulia, prince-portfolio-xi.vercel.app.
+Core Skills: JavaScript, C++, SQL, Python, Node.js, Express.js, PostgreSQL, pgvector, Supabase, MySQL, Redis, BullMQ, Socket.io, JWT Authentication, Gemini API, RAG Pipelines, Linux, Git.
 Key Projects:
-1. DocuMind (AI Document Assistant): Architected a RAG pipeline using Gemini API for vector embeddings and pgvector for cosine similarity search. Engineered an asynchronous PDF processing queue using BullMQ and ioredis. Improved retrieval quality with a custom 500-word boundary overlap chunking strategy.
-2. File Processing API: Built an async file ingestion API for multi-format uploads via Multer, BullMQ, and Upstash Redis. Integrated Sharp for server-side image transformation and Cloudinary for CDN delivery. Configured exponential backoff retry logic.
-3. RealChat: Built a real-time chat backend with Socket.io and JWT authentication. Engineered a PostgreSQL schema with B-tree indexing to speed up chat history retrieval. Implemented secure room-based broadcasting.
-Objective: To engineer scalable REST APIs, real-time architectures, and production-ready AI-integrated systems.
-"""
+1. DocuMind (AI Document Assistant): Architected a RAG pipeline using Gemini API for vector embeddings and pgvector for similarity search. Engineered an asynchronous PDF processing queue using BullMQ and ioredis. Improved retrieval quality with 500-word boundary overlap chunking.
+2. File Processing API: Built an async file ingestion API for multi-format uploads via Multer, BullMQ, and Upstash Redis. Integrated Sharp for image transformation and Cloudinary for CDN delivery.
+3. RealChat: Built a real-time chat backend with Socket.io and JWT authentication. Engineered PostgreSQL schema with B-tree indexing for fast message retrieval.
+Objective: To engineer scalable REST APIs, real-time architectures, and production-ready AI-integrated systems."""
 
-# 6. Execute and render
-# html_resume = main_agent(agent, query_string)
-# display(HTML(html_resume))
+    user_profile_query = st.text_area("Enter Profile & Experience Details:", value=default_query, height=220)
 
-# Calling the function
-# from IPython.display import display, HTML
+    if st.button("🚀 Generate Resume"):
+        llm = get_llm_model(gemini_api_key)
+        if llm:
+            with st.spinner("Generating ATS HTML Resume..."):
+                html_resume = generate_resume_html(llm, user_profile_query)
+                if html_resume:
+                    st.success("Resume Generated Successfully!")
+                    
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        st.download_button(
+                            label="📥 Download HTML Resume",
+                            data=html_resume,
+                            file_name="Prince_Gulia_Resume.html",
+                            mime="text/html"
+                        )
+                    with col2:
+                        st.subheader("Raw Code View")
+                        st.text_area("HTML Code", value=html_resume, height=200)
 
-# 3. Call your function
-query_string = "Agent Persona: Prince Gulia. Profile: Backend Developer and final-year BCA student (2024-2027, 9.52 CGPA) at Guru Gobind Singh Indraprastha University, New Delhi. Contact: princegulial70306@gmail.com, 8527875112, github.com/Prince-Gulia-. Core Skills: JavaScript, C++, SQL, Python, PHP, Node.js, Express, PostgreSQL, pgvector, Redis, BullMQ, Socket.io, Gemini API, RAG Pipelines. Key Projects: DocuMind (AI Document Assistant with Gemini API and async processing), File Processing API (multi-format background processing), RealChat (real-time WebSockets), FairPrice (price intelligence platform), DataLens (dataset analyzer), and a full-stack Study Tracker. Traits & Philosophy: Highly focused on backend efficiency, system scalability, and digging into complex, hidden programming concepts. Values hard work, continuous learning, and peace; actively avoids passive consumption and scrolling. Environment Preferences: Works best in dark-themed coding environments (specifically shades like 'Betel Leaf') while listening to Punjabi, Haryanvi, Electronic, and Phonk music. Objective: To engineer scalable REST APIs, real-time architectures, and production-ready AI-integrated systems."
+                    st.markdown("---")
+                    st.subheader("Live Preview")
+                    st.components.v1.html(html_resume, height=800, scrolling=True)
 
-# code = main_agent(agent, query_string)
+with tab2:
+    st.subheader("Find Targeted Job Openings")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        job_profile = st.text_input("Job Profile / Role", value="Backend Developer, Node.js")
+    with c2:
+        job_location = st.text_input("Location", value="New Delhi, Delhi")
 
-# 4. Wrap the HTML object inside the display() function to render it
-# display(HTML(code))
+    if st.button("🔍 Search Jobs"):
+        llm = get_llm_model(gemini_api_key)
+        if llm:
+            with st.spinner("Searching active listings on LinkedIn & Indeed via Tavily..."):
+                job_cards_html = generate_job_cards(llm, job_location, job_profile, tavily_api_key)
+                if job_cards_html:
+                    st.success("Job Listings Retrieved!")
+                    st.components.v1.html(job_cards_html, height=700, scrolling=True)
 
-# Tool for getting jobs
-def get_jobs(agent, Location="New Delhi, Delhi", Profile="Backend Developer, Node.JS"):
+with tab3:
+    st.subheader("Extract Text from Resume Image (OCR)")
+    st.write("Upload an image of an existing resume (.jpg, .png) to extract profile details using PyTesseract.")
 
-    # Enhanced prompt instructing the agent to specifically search LinkedIn and Indeed
-    prompt = f"""You are an expert job search assistant and web developer.
-    Your task is to find real, active job postings for the role of '{Profile}' in '{Location}'.
+    uploaded_file = st.file_uploader("Upload Image File", type=["png", "jpg", "jpeg"])
+    
+    if uploaded_file is not None:
+        try:
+            image = Image.open(uploaded_file)
+            st.image(image, caption="Uploaded Resume Image", width=400)
+            
+            if st.button("📷 Perform OCR Extraction"):
+                with st.spinner("Extracting text via Tesseract OCR..."):
+                    extracted_text = pyt.image_to_string(image)
+                    if extracted_text.strip():
+                        st.success("Text Extracted Successfully!")
+                        st.text_area("Extracted OCR Text", value=extracted_text, height=300)
+                    else:
+                        st.warning("No readable text found in the uploaded image.")
+        except Exception as e:
+            st.error(f"OCR Error: {str(e)}. Ensure Tesseract is installed and configured in the sidebar.")
 
-    CRITICAL SEARCH CONSTRAINTS:
-    1. ONLY source job postings from Indeed and LinkedIn. Do not use Naukri or other platforms.
-    2. Do NOT hallucinate or create fake job listings.
-    3. The 'Direct Apply Link' MUST be the actual, working HTTPS URL to the specific job posting on Indeed or LinkedIn. Do not use placeholders like '#' or '#apply'.
-
-    Requirements for Output:
-    1. Show 10 highly relevant job results.
-    2. Data points to include for each job card:
-        - JOB PROFILE NAME
-        - LOCATION
-        - SALARY (Provide the listed salary or an estimate based on market averages)
-        - COMPANY NAME
-        - Direct Apply Link (Must be a functional URL opening in a new tab: target="_blank")
-    3. UI/UX Design Requirements:
-        - Output MUST be strictly in HTML format. No markdown blocks (` ```html `).
-        - Use a professional, dynamic design inspired by modern job portals (clean white backgrounds, subtle shadow borders, professional blue accent colors for links/buttons).
-        - Display the results as modern, responsive HTML/CSS cards.
-        - The Apply button must be fully clickable and route to the actual LinkedIn/Indeed URL.
-    """
-
-    response = agent.invoke({'messages': [{'role': 'user', 'content': prompt}]})
-
-    # Extract the text content from the response
-    code = response['messages'][-1].content[-1]['text']
-
-    # Clean up potential markdown formatting if the agent disobeys the raw HTML instruction
-    code = code.replace("```html\n", "").replace("```html", "").replace("```", "").strip()
-
-    return code
-
-# code = get_jobs(agent)
-# display(HTML(code)) 
+st.markdown("---")
+st.markdown("<div style='text-align: center; color: #718096; font-size: 0.85rem;'>Engineered for High-Performance Backend Resume & Job Search Automation</div>", unsafe_allow_html=True)
