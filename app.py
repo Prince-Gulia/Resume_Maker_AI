@@ -10,6 +10,7 @@ from PIL import Image
 import pandas as pd
 import numpy as np
 import warnings
+import streamlit as st
 
 # To Show web-app: complete page layout
 st.set_page_config(layout="wide")
