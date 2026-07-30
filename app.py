@@ -13,7 +13,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from tavily import TavilyClient
 
-# Load environment variables from a local .env file if present
+# Load environment variables from local .env file
 load_dotenv()
 warnings.filterwarnings("ignore")
 
@@ -109,13 +109,14 @@ def clean_html_code(raw_code: str) -> str:
     return code.strip()
 
 def get_llm_model(api_key: str):
-    """Initializes Google Gemini model safely."""
+    """Initializes Google Gemini model safely using valid model string."""
     if not api_key or not api_key.startswith("AIzaSy"):
         st.error("⚠️ Invalid or missing Gemini API Key. Please enter a valid key starting with 'AIzaSy' from Google AI Studio (https://aistudio.google.com/).")
         return None
     try:
+        # Fixed: gemini-1.5-flash is the valid model identifier
         return ChatGoogleGenerativeAI(
-            model="gemini-3.5-flash",
+            model="gemini-1.5-flash",
             google_api_key=api_key,
             temperature=0.2
         )
