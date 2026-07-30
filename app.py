@@ -13,6 +13,7 @@ from langchain_core.tools import tool
 from tavily import TavilyClient
 # ──────────── Environment & Warnings ────────────
 load_dotenv()
+import warnings
 warnings.filterwarnings("ignore")
 # ──────────── Page Config ────────────
 st.set_page_config(
