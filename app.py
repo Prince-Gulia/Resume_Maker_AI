@@ -24,7 +24,7 @@ st.title("AI RESUME GENERATOR")
 st.write("""This app helps user to build customized Professional
 Resume with Latest Job apply links""")
 
-st.image("https://raw.githubusercontent.com/axisgras-hash/Agent-Resume/2efe115669995429b14e2fe102fd417d7481a5dd/bg.png")
+st.image("bg.png")
 
 st.sidebar.title("Fill Important Details")
 st.sidebar.image("https://raw.githubusercontent.com/axisgras-hash/Agent-Resume/2efe115669995429b14e2fe102fd417d7481a5dd/bg.png")
