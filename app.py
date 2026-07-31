@@ -24,10 +24,10 @@ st.title("AI RESUME GENERATOR")
 st.write("""This app helps user to build customized Professional
 Resume with Latest Job apply links""")
 
-st.image("bg.png")
+st.image("https://raw.githubusercontent.com/Prince-Gulia/Resume_Maker_AI/refs/heads/main/bg.png")
 
 st.sidebar.title("Fill Important Details")
-st.sidebar.image("https://raw.githubusercontent.com/axisgras-hash/Agent-Resume/2efe115669995429b14e2fe102fd417d7481a5dd/bg.png")
+st.sidebar.image("https://raw.githubusercontent.com/Prince-Gulia/Resume_Maker_AI/refs/heads/main/bg.png")
 
 
 
